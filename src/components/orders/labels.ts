@@ -1,0 +1,3 @@
+export const orderStatusNames = { AWAITING_PAYMENT: "در انتظار پرداخت", CONFIRMED: "تأییدشده", PROCESSING: "در حال آماده‌سازی", COMPLETED: "تکمیل‌شده", CANCELLED: "لغوشده" } as const;
+export const shipmentStatusNames: Record<string, string> = { PENDING: "در انتظار آماده‌سازی", PACKED: "بسته‌بندی‌شده", SHIPPED: "ارسال‌شده", DELIVERED: "تحویل‌شده", RETURNED: "برگشت‌خورده" };
+export const eventNames: Record<string, string> = { "admin.process": "شروع آماده‌سازی", "admin.cancel": "لغو سفارش", "admin.note": "یادداشت همکار", "admin.pack":"آمادهٔ ارسال شد", "shipping.selected":"روش ارسال انتخاب شد", "coupon.settled":"تسویه با تخفیف کامل", "followup.scheduled":"پیگیری پس از ارسال برنامه‌ریزی شد", "admin.ship": "ثبت ارسال", "admin.deliver": "ثبت تحویل" };

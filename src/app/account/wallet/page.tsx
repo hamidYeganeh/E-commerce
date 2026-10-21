@@ -1,0 +1,12 @@
+import {pageNumber,historyPageSize} from "@/shared/pagination";
+import {Suspense} from "react";
+import Link from "next/link";
+import {requirePageIdentity} from "@/modules/identity/request";
+import {getDatabase} from "@/infrastructure/database/server";
+import {wallet} from "@/modules/operations/customers";
+import {Preferences} from "@/components/operations/preferences";
+import {Card,CardHeader,CardTitle,CardDescription,CardContent} from "@/components/ui/card";
+import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from "@/components/ui/table";
+export const metadata={title:"کیف پول و اطلاع‌رسانی",robots:{index:false,follow:false}};
+export default function Page({searchParams}:{searchParams:Promise<{page?:string}>}){return <Suspense fallback={<p>در حال دریافت حساب…</p>}><Content searchParams={searchParams}/></Suspense>;}
+async function Content({searchParams}:{searchParams:Promise<{page?:string}>}){const page=pageNumber((await searchParams).page);const identity=await requirePageIdentity(),db=getDatabase(),d=await wallet(db,identity.user.id,page),preference=await db.customerPreference.findUnique({where:{userId:identity.user.id}});return <main className="store-container max-w-4xl py-10 grid gap-6"><Link href="/account">← حساب من</Link><Card><CardHeader><CardTitle>کیف پول شما</CardTitle><CardDescription>اعتبار: {BigInt(d.balanceRial).toLocaleString("fa-IR")} ریال</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>تاریخ</TableHead><TableHead>تغییر اعتبار ریال</TableHead><TableHead>توضیح</TableHead></TableRow></TableHeader><TableBody>{d.entries.map(e=><TableRow key={e.id}><TableCell>{e.createdAt.toLocaleDateString("fa-IR")}</TableCell><TableCell dir="ltr">{e.amountRial.toLocaleString("fa-IR")}</TableCell><TableCell>{e.reason}</TableCell></TableRow>)}</TableBody></Table><nav className="pagination" aria-label="صفحات گردش کیف پول">{page>1&&<Link href={`?page=${page-1}`}>صفحه قبل</Link>}<span>صفحه {page.toLocaleString("fa-IR")}</span>{page*historyPageSize<d.total&&<Link href={`?page=${page+1}`}>صفحه بعد</Link>}</nav>{!d.entries.length&&<p>تراکنشی ثبت نشده است.</p>}</CardContent></Card><Card><CardHeader><CardTitle>ترجیحات اطلاع‌رسانی</CardTitle><CardDescription>پیامک‌های مربوط به وضعیت سفارش مستقل از پیشنهادهای تبلیغاتی هستند.</CardDescription></CardHeader><CardContent><Preferences marketingConsent={preference?.marketingConsent??false}/></CardContent></Card></main>;}

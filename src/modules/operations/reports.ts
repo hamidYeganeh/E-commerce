@@ -1,0 +1,23 @@
+import {abandonedCartSql} from "./cart-query";
+import {Prisma,type PrismaClient} from "../../generated/prisma/client";
+import {requirePermission} from "../identity/authorization";
+import {jsonSafe} from "../../shared/json";
+type SalesPeriod = {revenue:bigint;subtotal:bigint;discount:bigint;shipping:bigint;orders:bigint;units:bigint};
+export async function salesReport(db:PrismaClient,actorId:string){
+ await requirePermission(db,actorId,"reports.read");
+ return db.$transaction(async tx=>{
+ const daily=await tx.$queryRaw<(SalesPeriod & {day:string})[]>`WITH days AS(SELECT generate_series((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date-29,(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date,'1 day')::date AS day), paid AS(SELECT o.*, (SELECT COALESCE(sum(i.quantity),0) FROM "OrderItem" i WHERE i."orderId"=o.id) AS units FROM "Order" o WHERE EXISTS(SELECT 1 FROM "PaymentAttempt" p WHERE p."orderId"=o.id AND p.status='SUCCEEDED')) SELECT d.day::text,COALESCE(sum(p."totalRial"),0)::bigint revenue,COALESCE(sum(p."subtotalRial"),0)::bigint subtotal,COALESCE(sum(p."discountRial"),0)::bigint discount,COALESCE(sum(p."shippingRial"),0)::bigint shipping,count(p.id)::bigint orders,COALESCE(sum(p.units),0)::bigint units FROM days d LEFT JOIN paid p ON (p."confirmedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tehran')::date=d.day GROUP BY d.day ORDER BY d.day DESC`;
+ const yearly=await tx.$queryRaw<(SalesPeriod & {year:string})[]>`SELECT to_char(o."confirmedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tehran','YYYY') AS year,sum(o."totalRial")::bigint revenue,sum(o."subtotalRial")::bigint subtotal,sum(o."discountRial")::bigint discount,sum(o."shippingRial")::bigint shipping,count(*)::bigint orders,sum((SELECT sum(i.quantity) FROM "OrderItem" i WHERE i."orderId"=o.id))::bigint units FROM "Order" o WHERE EXISTS(SELECT 1 FROM "PaymentAttempt" p WHERE p."orderId"=o.id AND p.status='SUCCEEDED') GROUP BY year ORDER BY year DESC LIMIT 10`;
+ const categories=await tx.$queryRaw<{id:string;name:string;units:bigint;revenue:bigint}[]>`SELECT c.id,c.name,sum(i.quantity)::bigint units,sum(i."totalRial")::bigint revenue FROM "OrderItem" i JOIN "Order" o ON o.id=i."orderId" JOIN "ProductVariant" v ON v.id=i."variantId" JOIN "ProductCategory" pc ON pc."productId"=v."productId" AND pc."isPrimary" JOIN "Category" c ON c.id=pc."categoryId" WHERE EXISTS(SELECT 1 FROM "PaymentAttempt" p WHERE p."orderId"=o.id AND p.status='SUCCEEDED') GROUP BY c.id,c.name ORDER BY units DESC LIMIT 10`;
+ const loyal=await tx.$queryRaw<{id:string;name:string;orders:bigint;revenue:bigint}[]>`SELECT u.id,u.name,count(o.id)::bigint orders,sum(o."totalRial")::bigint revenue FROM "User" u JOIN "Order" o ON o."userId"=u.id WHERE EXISTS(SELECT 1 FROM "PaymentAttempt" p WHERE p."orderId"=o.id AND p.status='SUCCEEDED') GROUP BY u.id,u.name ORDER BY orders DESC,revenue DESC LIMIT 10`;
+ const visits=await tx.$queryRaw<{kind:string;id:string;title:string;views:bigint}[]>`SELECT e.kind,e."targetId" AS id,COALESCE(p.name,r.title,'حذف‌شده') title,count(*)::bigint views FROM "VisitEvent" e LEFT JOIN "Product" p ON e.kind='product' AND p.id=e."targetId" LEFT JOIN "StoreRecord" r ON e.kind='article' AND r.id=e."targetId" WHERE e."createdAt">CURRENT_TIMESTAMP-INTERVAL '30 days' GROUP BY e.kind,e."targetId",p.name,r.title ORDER BY views DESC LIMIT 20`;
+ const registrations=await tx.user.count({where:{roles:{none:{}},createdAt:{gte:new Date(Date.now()-30*86400000)}}});
+ const refunds=(await tx.refund.aggregate({where:{status:"SUCCEEDED"},_sum:{amountRial:true}}))._sum.amountRial??0n;
+ const [cartCount]=await tx.$queryRaw<{count:bigint}[]>(Prisma.sql`SELECT count(*)::bigint AS count FROM "Cart" c WHERE ${abandonedCartSql()}`);const abandoned=Number(cartCount.count);
+ const first=await tx.order.findFirst({where:{confirmedAt:{not:null},payments:{some:{status:"SUCCEEDED"}}},orderBy:{confirmedAt:"asc"},select:{confirmedAt:true}});
+ const totalRevenue=daily.reduce((s,d)=>s+d.revenue,0n),totalOrders=daily.reduce((s,d)=>s+d.orders,0n),totalUnits=daily.reduce((s,d)=>s+d.units,0n);
+ const totalSubtotal=daily.reduce((s,d)=>s+d.subtotal,0n),totalDiscount=daily.reduce((s,d)=>s+d.discount,0n),totalShipping=daily.reduce((s,d)=>s+d.shipping,0n);
+ const forecast=first?.confirmedAt&&first.confirmedAt.getTime()<=Date.now()-14*86400000?(totalRevenue/30n*7n).toString():null;
+ return jsonSafe({daily,yearly,categories,loyal,visits,registrations,refunds,abandoned,totalRevenue,totalSubtotal,totalDiscount,totalShipping,totalOrders,totalUnits,averageUnits:totalOrders?Number(totalUnits*100n/totalOrders)/100:0,forecast});
+ },{isolationLevel:"RepeatableRead"});
+}

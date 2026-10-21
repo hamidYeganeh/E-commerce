@@ -1,0 +1,138 @@
+/* Each landing module owns its GSAP targets; global motion never writes DOM styles. */
+.page-motion-root { width: 100%; min-width: 0; flex: 1; }
+.motion-reveal-line { display: block; }
+.vb-hero { overflow: clip; }
+.vb-hero-orbit { position: absolute; inset: 0; z-index: 1; pointer-events: none; transform-origin: 50% 60%; }
+.vb-featured-link, .vb-hero-copy { z-index: 2; }
+
+@keyframes page-surface-in {
+  from { opacity: .65; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hero-product-in {
+  from { translate: 0 24px; scale: .94; rotate: -3deg; }
+  to { translate: 0 0; scale: 1; rotate: 0deg; }
+}
+@keyframes hero-orbit-drift {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(var(--hero-drift, 70px)) rotate(var(--hero-turn, 3deg)); }
+}
+@keyframes ritual-picture-drift {
+  from { transform: scale(1.07) translateY(-2%); }
+  to { transform: scale(1.07) translateY(2%); }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  /* Animate large surfaces once as they appear, with no delay on controls or
+     sticky totals. CSS does not change React's streamed HTML attributes. */
+  .page-motion-root :where(
+    .workspace-content > .page-heading,
+    .workspace-content > [data-slot="card"],
+    .workspace-content > .panel,
+    .metric-grid > *, .order-metrics > *,
+    .account-page > main > [data-slot="card"],
+    .commerce-heading, .customer-orders > *, .commerce-empty,
+    .commerce-lines, .product-gallery, .product-detail-info,
+    .product-description, .auth-card, .auth-aside, .info-faq > *,
+    .store-container > [data-slot="card"],
+    .store-container > .grid > [data-slot="card"]
+  ):not(.motion-reveal, .motion-reveal *):not(.commerce-summary *) {
+    animation: page-surface-in var(--duration-fast) var(--ease-smooth-out) backwards;
+  }
+  .page-motion-root :where(.commerce-lines, .product-detail-info, .auth-card):focus-within {
+    animation: none;
+  }
+  /* Individual properties preserve the jar's existing horizontal centering. */
+  .vb-hero-orbit > .vb-bottle {
+    animation: hero-product-in 850ms var(--ease-bounce) backwards;
+  }
+  @supports (animation-timeline: view()) {
+    /* Existing wrappers own parallax. Next/Image remains untouched, including
+       the streamed editorial banners, scenic backgrounds and footer images. */
+    .vb-hero { view-timeline-name: --hero-drift; }
+    .vb-hero-orbit {
+      animation: hero-orbit-drift 1ms linear both;
+      animation-timeline: --hero-drift;
+      animation-range: exit 0% exit 100%;
+    }
+    .vb-ritual { view-timeline-name: --ritual-drift; }
+    .vb-ritual > picture {
+      animation: ritual-picture-drift 1ms linear both;
+      animation-timeline: --ritual-drift;
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+@media (max-width: 850px) {
+  .vb-hero-orbit { --hero-drift: 24px; --hero-turn: 1deg; }
+}
+
+:root {
+  --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --duration-micro: 80ms;
+  --duration-medium: 350ms;
+  --distance-base: 8px;
+  --learn-shift: -2px;
+  --learn-spread: 8deg;
+  --learn-in: var(--duration-fast);
+  --learn-out: var(--duration-medium);
+  --learn-ease: var(--ease-smooth-out);
+  --digit-stagger: var(--duration-stagger);
+  --digit-ease: var(--ease-bounce);
+  --badge-pop-dur: var(--duration-very-slow);
+  --badge-pop-ease: var(--ease-bounce);
+  --badge-pop-close-dur: var(--duration-quick);
+  --badge-fade-close-dur: var(--duration-quick);
+  --check-bob-dur: var(--duration-very-slow);
+  --check-ease-bob: var(--ease-bounce);
+  --check-path-delay: var(--duration-micro);
+  --check-y-amount: var(--distance-medium);
+}
+
+/* transitions.dev recipe 24, verbatim; timings above share the existing token scale. */
+.t-learn-chevron {
+  display: inline-flex;
+  transform: translateX(0);
+  transition: transform var(--learn-out) var(--learn-ease);
+}
+.t-learn-arm {
+  transform-box: view-box;
+  transform-origin: 10px 8px;
+  vector-effect: non-scaling-stroke;
+  transition: transform var(--learn-out) var(--learn-ease);
+}
+.t-learn:hover .t-learn-chevron { transform: translateX(var(--learn-shift)); transition-duration: var(--learn-in); }
+.t-learn:hover .t-learn-arm { transition-duration: var(--learn-in); }
+.t-learn:hover .t-learn-arm-top { transform: rotate(var(--learn-spread)); }
+.t-learn:hover .t-learn-arm-bot { transform: rotate(calc(var(--learn-spread) * -1)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .t-learn-chevron, .t-learn-arm { transition: none !important; }
+}
+
+html[dir="rtl"] .t-learn-chevron > svg { rotate: 180deg; }
+.page-motion-root [data-slot="button"] { transition-property: background-color, color, border-color, box-shadow, transform, scale; transition-duration: var(--duration-fast); transition-timing-function: var(--ease-smooth-out); }
+.vb-header nav a { position: relative; }
+.vb-header nav a[aria-current="page"] { text-decoration: none; }
+.vb-header nav a::after { content: ""; position: absolute; height: 2px; inset-inline: 0; bottom: 5px; background: var(--primary); transform: scaleX(0); transform-origin: right; transition: transform var(--duration-fast) var(--ease-smooth-out); }
+.vb-header nav a[aria-current="page"]::after { transform: scaleX(1); }
+.vb-icon-tile > svg { transition: transform var(--duration-medium) var(--ease-bounce); }
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  [data-slot="button"]:not(:disabled):not([aria-disabled="true"]):hover { scale: 1.025; }
+  [data-slot="button"]:not(:disabled):not([aria-disabled="true"]):active { scale: .97; transition-duration: var(--duration-quick); }
+  .product-card[data-slot="card"] { transition-timing-function: var(--ease-bounce); transition-duration: var(--duration-medium); }
+  .product-card[data-slot="card"]:hover { transition-timing-function: var(--ease-smooth-out); transition-duration: var(--duration-fast); }
+  .vb-header nav a:hover::after { transform: scaleX(1); }
+  [data-slot="card"]:hover .vb-icon-tile > svg, .vb-ingredient-features .motion-reveal-line:hover .vb-icon-tile > svg { transform: rotate(-8deg) scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vb-hero-orbit, .motion-reveal-line { transform: none !important; opacity: 1 !important; }
+  .vb-icon-tile > svg, .vb-header nav a::after { transition: none !important; }
+}
+@media print {
+  .motion-reveal-line { opacity: 1 !important; transform: none !important; }
+  .page-motion-root { display: block; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,6 @@
+import {connection} from "next/server";
+import type {MetadataRoute} from "next";
+import {getDatabase} from "@/infrastructure/database/server";
+import {getLookups,visibleCategoryIds} from "@/modules/catalog/repository";
+import {purchasePolicy} from "@/modules/catalog/purchase-policy";
+export default async function sitemap():Promise<MetadataRoute.Sitemap>{await connection();const db=getDatabase(),origin=process.env.NEXT_PUBLIC_SITE_URL??"http://localhost:3000",lookups=await getLookups(db),visible=visibleCategoryIds(lookups.categories),policy=purchasePolicy(visible);const [products,articles]=await Promise.all([db.product.findMany({where:policy.productWhere,select:{slug:true,updatedAt:true}}),db.storeRecord.findMany({where:{kind:"article",status:"ACTIVE"},select:{slug:true,updatedAt:true}})]);return[...['/','/products','/about','/contact','/faq','/blog'].map(path=>({url:`${origin}${path}`})),...products.map(p=>({url:`${origin}/products/${p.slug}`,lastModified:p.updatedAt})),...lookups.categories.filter(c=>visible.includes(c.id)).map(c=>({url:`${origin}/categories/${c.slug}`,lastModified:c.updatedAt})),...lookups.tags.filter(t=>t.isIndexable).map(t=>({url:`${origin}/tags/${t.slug}`,lastModified:t.updatedAt})),...articles.map(a=>({url:`${origin}/blog/${a.slug}`,lastModified:a.updatedAt}))];}

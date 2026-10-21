@@ -1,0 +1,3 @@
+import {Prisma} from "../../generated/prisma/client";
+// c is a Cart alias. Reuse before count, pagination and aggregation.
+export function abandonedCartSql(now=new Date(),q="") {return Prisma.sql`c."updatedAt"<${new Date(now.getTime()-7200000)} AND (c."expiresAt" IS NULL OR c."expiresAt">${now}) AND EXISTS(SELECT 1 FROM "CartItem" i WHERE i."cartId"=c.id) AND NOT EXISTS(SELECT 1 FROM "Order" o WHERE o."userId"=c."userId" AND o."createdAt">=c."updatedAt" AND o.status<>'CANCELLED') ${q?Prisma.sql`AND EXISTS(SELECT 1 FROM "User" u WHERE u.id=c."userId" AND u.name ILIKE ${`%${q.replace(/[\\%_]/g,"\\$&")}%`})`:Prisma.empty}`;}
